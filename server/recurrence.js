@@ -9,8 +9,9 @@ const {
 
 const SLOT_MINUTES = 30;
 const DAY_START_HOUR = 7;
-const DAY_END_HOUR = 21;
-const SLOTS_PER_DAY = ((DAY_END_HOUR - DAY_START_HOUR) * 60) / SLOT_MINUTES;
+const DAY_END_HOUR = 23;
+const DAY_END_MINUTE = 30;
+const SLOTS_PER_DAY = ((DAY_END_HOUR * 60 + DAY_END_MINUTE) - DAY_START_HOUR * 60) / SLOT_MINUTES;
 
 function getWeekStart(date, tzOffsetMin) {
   const dateStr = resolveWeekStartDateStr(date, tzOffsetMin);

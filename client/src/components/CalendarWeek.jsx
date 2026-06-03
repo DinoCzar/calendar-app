@@ -4,6 +4,7 @@ import {
   SLOTS_PER_DAY,
   SLOT_HEIGHT,
   SLOT_MINUTES,
+  DAY_START_HOUR,
   getDayDate,
   formatSlotTime,
   getWeekStart,
@@ -160,8 +161,8 @@ function NowLine({ weekStart, now }) {
   const todayIndex = Math.round((now - weekStart) / (24 * 60 * 60 * 1000));
   if (todayIndex < 0 || todayIndex > 6) return null;
 
-  const minutes = now.getHours() * 60 + now.getMinutes() - 7 * 60;
-  if (minutes < 0 || minutes >= 14 * 60) return null;
+  const minutes = now.getHours() * 60 + now.getMinutes() - DAY_START_HOUR * 60;
+  if (minutes < 0 || minutes >= SLOTS_PER_DAY * SLOT_MINUTES) return null;
 
   const top = (minutes / 30) * SLOT_HEIGHT;
 
@@ -249,7 +250,8 @@ export default function CalendarWeek({
               const date = getDayDate(weekStart, dayIndex);
               const isToday = date.toDateString() === todayStr;
               const slotDate = new Date(date);
-              slotDate.setHours(7, slotIndex * 30, 0, 0);
+              const slotMinutes = DAY_START_HOUR * 60 + slotIndex * SLOT_MINUTES;
+              slotDate.setHours(Math.floor(slotMinutes / 60), slotMinutes % 60, 0, 0);
               return (
                 <CalendarSlot
                   key={`${dayIndex}-${slotIndex}`}
