@@ -373,6 +373,7 @@ select {
   border-bottom: 1px solid rgba(229, 229, 234, 0.7);
   border-left: 1px solid var(--border);
   min-height: 28px;
+  z-index: 0;
 }
 
 .cal-slot--today {
@@ -389,8 +390,23 @@ select {
   outline-offset: -2px;
 }
 
+.calendar--dragging .cal-slot {
+  z-index: 3;
+}
+
+.calendar--dragging .calendar__scroll {
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
 .calendar--dragging .cal-event:not(.cal-event--dragging) {
   pointer-events: none;
+}
+
+.cal-event--dragging {
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .cal-event {
@@ -398,17 +414,45 @@ select {
   border-radius: 8px;
   color: white;
   font-size: 0.72rem;
-  cursor: grab;
   overflow: hidden;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
   position: relative;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   z-index: 2;
 }
 
-.cal-event:active {
+.cal-event__drag-handle {
+  flex-shrink: 0;
+  width: 14px;
+  border: none;
+  background: rgba(0, 0, 0, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: grab;
+  padding: 0;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  letter-spacing: -1px;
+}
+
+.cal-event__drag-handle:active {
   cursor: grabbing;
+}
+
+.cal-event__drag-handle::before {
+  content: '⋮⋮';
+  line-height: 1;
+}
+
+.cal-event__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .cal-event--recurring {
@@ -418,7 +462,8 @@ select {
 .cal-event__content {
   padding: 0.3rem 0.45rem;
   flex: 1;
-  pointer-events: none;
+  min-width: 0;
+  pointer-events: auto;
 }
 
 .cal-event__title {
@@ -427,7 +472,6 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  pointer-events: auto;
   border: none;
   background: transparent;
   color: inherit;
@@ -481,6 +525,8 @@ select {
   padding: 0.5rem;
   min-width: 120px;
   box-shadow: var(--shadow);
+  cursor: grabbing;
+  touch-action: none;
 }
 
 .now-line {

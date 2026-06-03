@@ -3,6 +3,8 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
   closestCenter,
@@ -31,6 +33,7 @@ import {
   addWeeks,
   parseParentId,
   EVENT_COLORS,
+  SLOT_HEIGHT,
 } from './utils/dates';
 
 export default function App() {
@@ -79,16 +82,28 @@ export default function App() {
   }, []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor)
   );
 
   const slotCollision = useCallback((args) => {
-    const hits = pointerWithin(args);
-    const slot = hits.find(({ id }) => String(id).startsWith('slot-'));
-    if (slot) return [slot];
-    const rect = rectIntersection(args).find(({ id }) => String(id).startsWith('slot-'));
-    if (rect) return [rect];
-    return closestCenter(args);
+    if (!String(args.active.id).startsWith('event-')) {
+      return closestCenter(args);
+    }
+
+    const isSlot = ({ id }) => String(id).startsWith('slot-');
+
+    const pointerHits = pointerWithin(args).filter(isSlot);
+    if (pointerHits.length) return [pointerHits[0]];
+
+    const rectHits = rectIntersection(args).filter(isSlot);
+    if (rectHits.length) return [rectHits[0]];
+
+    const centerHits = closestCenter(args).filter(isSlot);
+    if (centerHits.length) return [centerHits[0]];
+
+    return [];
   }, []);
 
   const parseSlotId = (id) => {
@@ -288,9 +303,15 @@ export default function App() {
           />
         </main>
 
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={null} zIndex={1000}>
           {activeEvent ? (
-            <div className="cal-event cal-event--overlay" style={{ backgroundColor: activeEvent.color }}>
+            <div
+              className="cal-event cal-event--overlay"
+              style={{
+                backgroundColor: activeEvent.color,
+                height: `${Math.ceil(activeEvent.durationMinutes / 30) * SLOT_HEIGHT - 2}px`,
+              }}
+            >
               <span className="cal-event__title">{activeEvent.title}</span>
             </div>
           ) : null}

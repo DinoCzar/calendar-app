@@ -83,26 +83,38 @@ function EventBlock({ event, weekStart, onResize, onDelete, onTitleChange }) {
       ref={setNodeRef}
       className={`cal-event${isDragging ? ' cal-event--dragging' : ''}${event.recurrenceType === 'weekly' ? ' cal-event--recurring' : ''}`}
       style={style}
-      {...listeners}
-      {...attributes}
     >
-      <div className="cal-event__content">
-        <input
-          className="cal-event__title"
-          value={event.title}
-          onChange={(e) => onTitleChange(event, e.target.value)}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          aria-label="Event name"
-        />
-        <span className="cal-event__time">
-          {start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-          {event.recurrenceType === 'weekly' ? ' · Weekly' : ''}
-        </span>
+      <button
+        type="button"
+        className="cal-event__drag-handle"
+        aria-label="Drag event"
+        {...listeners}
+        {...attributes}
+      />
+      <div className="cal-event__body">
+        <div className="cal-event__content">
+          <input
+            className="cal-event__title"
+            value={event.title}
+            onChange={(e) => onTitleChange(event, e.target.value)}
+            aria-label="Event name"
+          />
+          <span className="cal-event__time">
+            {start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+            {event.recurrenceType === 'weekly' ? ' · Weekly' : ''}
+          </span>
+        </div>
+        <div className="cal-event__resize" onPointerDown={handleResizeStart} />
       </div>
-      <button type="button" className="cal-event__delete" onClick={() => onDelete(event)} aria-label="Delete">×</button>
-      <div className="cal-event__resize" onPointerDown={handleResizeStart} />
+      <button
+        type="button"
+        className="cal-event__delete"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => onDelete(event)}
+        aria-label="Delete"
+      >
+        ×
+      </button>
     </div>
   );
 }
