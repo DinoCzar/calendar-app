@@ -2,9 +2,14 @@
   "name": "calendar-app",
   "private": true,
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "start": "NODE_ENV=production node server/index.js",
     "start:server": "npm start --prefix server",
     "start:client": "npm run dev --prefix client"
   },

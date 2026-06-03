@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { randomUUID } = require('crypto');
 const db = require('./db');
 const {
@@ -279,6 +280,15 @@ app.delete('/api/events/:id', (req, res) => {
   db.prepare('DELETE FROM calendar_events WHERE id = ?').run(parentId);
   res.status(204).send();
 });
+
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '../client/dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

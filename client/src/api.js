@@ -1,4 +1,7 @@
+import * as localStore from './localStore';
+
 const BASE = '/api';
+const useLocal = import.meta.env.VITE_USE_LOCAL_API === 'true';
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -13,53 +16,57 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-export function fetchWeek(weekStart) {
-  const q = weekStart ? `?weekStart=${encodeURIComponent(new Date(weekStart).toISOString())}` : '';
-  return request(`/week${q}`);
-}
+export const fetchWeek = useLocal
+  ? localStore.fetchWeek
+  : (weekStart) => {
+      const q = weekStart ? `?weekStart=${encodeURIComponent(new Date(weekStart).toISOString())}` : '';
+      return request(`/week${q}`);
+    };
 
-export function fetchSmartTasks() {
-  return request('/smart-tasks');
-}
+export const fetchSmartTasks = useLocal
+  ? localStore.fetchSmartTasks
+  : () => request('/smart-tasks');
 
-export function createSmartTask(data) {
-  return request('/smart-tasks', { method: 'POST', body: JSON.stringify(data) });
-}
+export const createSmartTask = useLocal
+  ? localStore.createSmartTask
+  : (data) => request('/smart-tasks', { method: 'POST', body: JSON.stringify(data) });
 
-export function updateSmartTask(id, data) {
-  return request(`/smart-tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
-}
+export const updateSmartTask = useLocal
+  ? localStore.updateSmartTask
+  : (id, data) => request(`/smart-tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 
-export function deleteSmartTask(id) {
-  return request(`/smart-tasks/${id}`, { method: 'DELETE' });
-}
+export const deleteSmartTask = useLocal
+  ? localStore.deleteSmartTask
+  : (id) => request(`/smart-tasks/${id}`, { method: 'DELETE' });
 
-export function reorderSmartTasks(orderedIds) {
-  return request('/smart-tasks/reorder', {
-    method: 'PUT',
-    body: JSON.stringify({ orderedIds }),
-  });
-}
+export const reorderSmartTasks = useLocal
+  ? localStore.reorderSmartTasks
+  : (orderedIds) =>
+      request('/smart-tasks/reorder', {
+        method: 'PUT',
+        body: JSON.stringify({ orderedIds }),
+      });
 
-export function scheduleSmartTasks(weekStart) {
-  return request('/smart-tasks/schedule', {
-    method: 'POST',
-    body: JSON.stringify({ weekStart: new Date(weekStart).toISOString() }),
-  });
-}
+export const scheduleSmartTasks = useLocal
+  ? localStore.scheduleSmartTasks
+  : (weekStart) =>
+      request('/smart-tasks/schedule', {
+        method: 'POST',
+        body: JSON.stringify({ weekStart: new Date(weekStart).toISOString() }),
+      });
 
-export function createEvent(data) {
-  return request('/events', { method: 'POST', body: JSON.stringify(data) });
-}
+export const createEvent = useLocal
+  ? localStore.createEvent
+  : (data) => request('/events', { method: 'POST', body: JSON.stringify(data) });
 
-export function updateEvent(id, data) {
-  return request(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
-}
+export const updateEvent = useLocal
+  ? localStore.updateEvent
+  : (id, data) => request(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 
-export function moveEvent(id, data) {
-  return request(`/events/${id}/move`, { method: 'POST', body: JSON.stringify(data) });
-}
+export const moveEvent = useLocal
+  ? localStore.moveEvent
+  : (id, data) => request(`/events/${id}/move`, { method: 'POST', body: JSON.stringify(data) });
 
-export function deleteEvent(id) {
-  return request(`/events/${id}`, { method: 'DELETE' });
-}
+export const deleteEvent = useLocal
+  ? localStore.deleteEvent
+  : (id) => request(`/events/${id}`, { method: 'DELETE' });
