@@ -1,4 +1,3 @@
-import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useState, useRef } from 'react';
 import {
   DAY_NAMES,
@@ -11,36 +10,41 @@ import {
   eventToSlot,
 } from '../utils/dates';
 
-function CalendarSlot({ dayIndex, slotIndex, isToday, isPast, isHoverTarget }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `slot-${dayIndex}-${slotIndex}` });
+const DRAG_THRESHOLD = 8;
 
+function CalendarSlot({ dayIndex, slotIndex, isToday, isPast, isHoverTarget }) {
   return (
     <div
-      ref={setNodeRef}
       data-day-index={dayIndex}
       data-slot-index={slotIndex}
       className={[
         'cal-slot',
         isToday && 'cal-slot--today',
         isPast && 'cal-slot--past',
-        (isOver || isHoverTarget) && 'cal-slot--over',
+        isHoverTarget && 'cal-slot--over',
       ].filter(Boolean).join(' ')}
       style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}
     />
   );
 }
 
-function EventBlock({ event, weekStart, onResize, onDelete, onTitleChange }) {
+function EventBlock({
+  event,
+  weekStart,
+  isDraggingThis,
+  onResize,
+  onDelete,
+  onTitleChange,
+  onEventDragStart,
+  onEventDragMove,
+  onEventDragEnd,
+}) {
   const { dayIndex, slotIndex, slotCount } = eventToSlot(event, weekStart);
   const [resizing, setResizing] = useState(false);
   const startY = useRef(0);
   const startDuration = useRef(event.durationMinutes);
-
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `event-${event.id}`,
-    data: { type: 'event', event },
-    disabled: resizing,
-  });
+  const dragStart = useRef({ x: 0, y: 0 });
+  const dragging = useRef(false);
 
   const handleResizeStart = (e) => {
     e.stopPropagation();
@@ -68,13 +72,46 @@ function EventBlock({ event, weekStart, onResize, onDelete, onTitleChange }) {
     window.addEventListener('pointerup', onUp);
   };
 
+  const handleDragPointerDown = (e) => {
+    if (resizing || e.button > 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    dragging.current = false;
+
+    const onMove = (moveEvent) => {
+      if (!dragging.current) {
+        const dx = moveEvent.clientX - dragStart.current.x;
+        const dy = moveEvent.clientY - dragStart.current.y;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        dragging.current = true;
+        onEventDragStart(event, moveEvent.clientX, moveEvent.clientY);
+      }
+      if (dragging.current) {
+        onEventDragMove(moveEvent.clientX, moveEvent.clientY);
+      }
+    };
+
+    const onUp = (upEvent) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (dragging.current) {
+        onEventDragEnd(upEvent.clientX, upEvent.clientY, event);
+      }
+      dragging.current = false;
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   const style = {
     gridColumn: dayIndex + 2,
     gridRow: `${slotIndex + 2} / span ${slotCount}`,
-    transform: isDragging ? undefined : transform
-      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
-      : undefined,
-    opacity: isDragging ? 0.6 : 1,
+    opacity: isDraggingThis ? 0.25 : 1,
     backgroundColor: event.color,
   };
 
@@ -82,16 +119,14 @@ function EventBlock({ event, weekStart, onResize, onDelete, onTitleChange }) {
 
   return (
     <div
-      ref={setNodeRef}
-      className={`cal-event${isDragging ? ' cal-event--dragging' : ''}${event.recurrenceType === 'weekly' ? ' cal-event--recurring' : ''}`}
+      className={`cal-event${isDraggingThis ? ' cal-event--dragging' : ''}${event.recurrenceType === 'weekly' ? ' cal-event--recurring' : ''}`}
       style={style}
     >
       <button
         type="button"
         className="cal-event__drag-handle"
         aria-label="Drag event"
-        {...listeners}
-        {...attributes}
+        onPointerDown={handleDragPointerDown}
       />
       <div className="cal-event__body">
         <div className="cal-event__content">
@@ -143,6 +178,7 @@ export default function CalendarWeek({
   now,
   events,
   isDragging,
+  draggingEventId,
   hoverSlot,
   onPrevWeek,
   onNextWeek,
@@ -151,6 +187,9 @@ export default function CalendarWeek({
   onResize,
   onDelete,
   onTitleChange,
+  onEventDragStart,
+  onEventDragMove,
+  onEventDragEnd,
 }) {
   const todayStr = now.toDateString();
   const viewingCurrent = weekStart.toDateString() === getWeekStart(now).toDateString();
@@ -231,9 +270,13 @@ export default function CalendarWeek({
               key={event.id}
               event={event}
               weekStart={weekStart}
+              isDraggingThis={draggingEventId === event.id}
               onResize={onResize}
               onDelete={onDelete}
               onTitleChange={onTitleChange}
+              onEventDragStart={onEventDragStart}
+              onEventDragMove={onEventDragMove}
+              onEventDragEnd={onEventDragEnd}
             />
           ))}
 

@@ -54,6 +54,18 @@ export function eventToSlot(event, weekStart) {
   };
 }
 
+export function eventAtSlot(event, weekStart, dayIndex, slotIndex) {
+  const date = getDayDate(getWeekStart(weekStart), dayIndex);
+  const startMinutes = DAY_START_HOUR * 60 + slotIndex * SLOT_MINUTES;
+  date.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+  const end = new Date(date.getTime() + event.durationMinutes * 60 * 1000);
+  return {
+    ...event,
+    startTime: date.toISOString(),
+    endTime: end.toISOString(),
+  };
+}
+
 export function parseParentId(id) {
   const str = String(id);
   const match = str.match(/^(.+)-w\d+$/);

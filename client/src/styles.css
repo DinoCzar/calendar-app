@@ -530,6 +530,22 @@ select {
   pointer-events: none;
 }
 
+.cal-event--floating {
+  position: fixed;
+  z-index: 10000;
+  width: 140px;
+}
+
+body.calendar-drag-active {
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+body.calendar-drag-active .calendar__scroll {
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
 .now-line {
   position: relative;
   pointer-events: none;
