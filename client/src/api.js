@@ -1,7 +1,13 @@
 import * as localStore from './localStore';
 
 const BASE = '/api';
-const useLocal = import.meta.env.VITE_USE_LOCAL_API === 'true';
+
+function isGitHubPagesHost() {
+  return typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+}
+
+const useLocal =
+  import.meta.env.VITE_USE_LOCAL_API === 'true' || isGitHubPagesHost();
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
