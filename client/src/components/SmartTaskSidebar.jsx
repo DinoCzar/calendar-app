@@ -56,7 +56,9 @@ export default function SmartTaskSidebar({
   onUpdate,
   onDelete,
   onSchedule,
+  onRecall,
   scheduling,
+  recalling,
 }) {
   return (
     <aside className="sidebar">
@@ -87,14 +89,24 @@ export default function SmartTaskSidebar({
         <button type="button" className="btn btn--secondary" onClick={onAdd}>
           + New Smart Task
         </button>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={onSchedule}
-          disabled={scheduling || tasks.length === 0}
-        >
-          {scheduling ? 'Scheduling…' : 'Add Smart Tasks'}
-        </button>
+        <div className="sidebar__actions-row">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={onRecall}
+            disabled={recalling || scheduling}
+          >
+            {recalling ? 'Recalling…' : 'Recall Tasks'}
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={onSchedule}
+            disabled={scheduling || recalling || tasks.length === 0}
+          >
+            {scheduling ? 'Scheduling…' : 'Add Smart Tasks'}
+          </button>
+        </div>
       </div>
     </aside>
   );
