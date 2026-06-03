@@ -1,4 +1,5 @@
 import * as localStore from './localStore';
+import { getWeekStart, toDateInputValue } from './utils/dates';
 
 const BASE = '/api';
 
@@ -8,6 +9,18 @@ function isGitHubPagesHost() {
 
 const useLocal =
   import.meta.env.VITE_USE_LOCAL_API === 'true' || isGitHubPagesHost();
+
+function tzOffset() {
+  return new Date().getTimezoneOffset();
+}
+
+function weekStartDate(weekStart) {
+  return toDateInputValue(weekStart ? getWeekStart(new Date(weekStart)) : getWeekStart());
+}
+
+function withTz(params = {}) {
+  return { ...params, tzOffset: String(tzOffset()) };
+}
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -25,8 +38,8 @@ async function request(path, options = {}) {
 export const fetchWeek = useLocal
   ? localStore.fetchWeek
   : (weekStart) => {
-      const q = weekStart ? `?weekStart=${encodeURIComponent(new Date(weekStart).toISOString())}` : '';
-      return request(`/week${q}`);
+      const q = new URLSearchParams(withTz({ weekStart: weekStartDate(weekStart) })).toString();
+      return request(`/week?${q}`);
     };
 
 export const fetchSmartTasks = useLocal
@@ -58,7 +71,7 @@ export const scheduleSmartTasks = useLocal
   : (weekStart) =>
       request('/smart-tasks/schedule', {
         method: 'POST',
-        body: JSON.stringify({ weekStart: new Date(weekStart).toISOString() }),
+        body: JSON.stringify(withTz({ weekStart: weekStartDate(weekStart) })),
       });
 
 export const createEvent = useLocal
@@ -71,7 +84,15 @@ export const updateEvent = useLocal
 
 export const moveEvent = useLocal
   ? localStore.moveEvent
-  : (id, data) => request(`/events/${id}/move`, { method: 'POST', body: JSON.stringify(data) });
+  : (id, data) =>
+      request(`/events/${id}/move`, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          weekStart: weekStartDate(data.weekStart),
+          tzOffset: tzOffset(),
+        }),
+      });
 
 export const deleteEvent = useLocal
   ? localStore.deleteEvent
