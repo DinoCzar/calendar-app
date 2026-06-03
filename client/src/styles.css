@@ -527,6 +527,7 @@ select {
   box-shadow: var(--shadow);
   cursor: grabbing;
   touch-action: none;
+  pointer-events: none;
 }
 
 .now-line {

@@ -11,17 +11,19 @@ import {
   eventToSlot,
 } from '../utils/dates';
 
-function CalendarSlot({ dayIndex, slotIndex, isToday, isPast }) {
+function CalendarSlot({ dayIndex, slotIndex, isToday, isPast, isHoverTarget }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot-${dayIndex}-${slotIndex}` });
 
   return (
     <div
       ref={setNodeRef}
+      data-day-index={dayIndex}
+      data-slot-index={slotIndex}
       className={[
         'cal-slot',
         isToday && 'cal-slot--today',
         isPast && 'cal-slot--past',
-        isOver && 'cal-slot--over',
+        (isOver || isHoverTarget) && 'cal-slot--over',
       ].filter(Boolean).join(' ')}
       style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}
     />
@@ -141,6 +143,7 @@ export default function CalendarWeek({
   now,
   events,
   isDragging,
+  hoverSlot,
   onPrevWeek,
   onNextWeek,
   onToday,
@@ -215,6 +218,9 @@ export default function CalendarWeek({
                   slotIndex={slotIndex}
                   isToday={isToday}
                   isPast={slotDate < now}
+                  isHoverTarget={
+                    hoverSlot?.dayIndex === dayIndex && hoverSlot?.slotIndex === slotIndex
+                  }
                 />
               );
             })

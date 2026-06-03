@@ -34,7 +34,9 @@ import {
   parseParentId,
   EVENT_COLORS,
   SLOT_HEIGHT,
+  eventToSlot,
 } from './utils/dates';
+import { resolveDropSlot, pointerFromDragEvent, slotAtPoint, clampDropSlot } from './utils/gridDrop';
 
 export default function App() {
   const [weekStart, setWeekStart] = useState(() => getWeekStart());
@@ -48,6 +50,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [previewEvents, setPreviewEvents] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [hoverSlot, setHoverSlot] = useState(null);
 
   const loadWeek = useCallback(async (ws) => {
     const data = await fetchWeek(ws);
@@ -106,33 +109,38 @@ export default function App() {
     return [];
   }, []);
 
-  const parseSlotId = (id) => {
-    if (!String(id).startsWith('slot-')) return null;
-    const [, day, slot] = String(id).split('-');
-    return { dayIndex: Number(day), slotIndex: Number(slot) };
-  };
-
   const handleDragStart = (e) => {
     setIsDragging(true);
+    setHoverSlot(null);
     if (String(e.active.id).startsWith('event-')) {
       setActiveEvent(e.active.data.current?.event ?? null);
     }
   };
 
+  const handleDragMove = (e) => {
+    if (!String(e.active.id).startsWith('event-')) return;
+    const pointer = pointerFromDragEvent(e);
+    setHoverSlot(pointer ? slotAtPoint(pointer.x, pointer.y) : null);
+  };
+
   const handleDragEnd = async (e) => {
-    const { active, over } = e;
+    const { active } = e;
     setIsDragging(false);
     setActiveEvent(null);
-
-    if (!over) return;
+    setHoverSlot(null);
 
     const activeId = String(active.id);
 
     if (activeId.startsWith('event-')) {
-      const slot = parseSlotId(over.id);
+      const rawSlot = resolveDropSlot(e);
+      const slot = clampDropSlot(rawSlot, active.data.current?.event?.durationMinutes ?? 30);
       if (!slot) return;
       const event = active.data.current?.event;
       if (!event) return;
+
+      const { dayIndex, slotIndex } = eventToSlot(event, weekStart);
+      if (dayIndex === slot.dayIndex && slotIndex === slot.slotIndex) return;
+
       try {
         await moveEvent(parseParentId(event.id), {
           weekStart,
@@ -146,6 +154,9 @@ export default function App() {
       }
       return;
     }
+
+    const { over } = e;
+    if (!over) return;
 
     if (active.data.current?.type === 'smart-task') {
       const overId = String(over.id);
@@ -264,10 +275,12 @@ export default function App() {
         sensors={sensors}
         collisionDetection={slotCollision}
         onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onDragCancel={() => {
           setIsDragging(false);
           setActiveEvent(null);
+          setHoverSlot(null);
         }}
       >
         <main className="layout">
@@ -276,6 +289,7 @@ export default function App() {
             now={now}
             events={previewEvents ?? events}
             isDragging={isDragging}
+            hoverSlot={hoverSlot}
             onPrevWeek={() => setWeekStart((w) => addWeeks(w, -1))}
             onNextWeek={() => setWeekStart((w) => addWeeks(w, 1))}
             onToday={() => setWeekStart(getWeekStart(now))}

@@ -43,11 +43,15 @@ export function formatSlotTime(slotIndex) {
 export function eventToSlot(event, weekStart) {
   const start = new Date(event.startTime);
   const ws = getWeekStart(weekStart);
-  const dayIndex = Math.round((start - ws) / (24 * 60 * 60 * 1000));
+  const dayIndex = Math.floor((start.getTime() - ws.getTime()) / (24 * 60 * 60 * 1000));
   const totalMinutes = start.getHours() * 60 + start.getMinutes() - DAY_START_HOUR * 60;
-  const slotIndex = Math.floor(totalMinutes / SLOT_MINUTES);
-  const slotCount = Math.ceil(event.durationMinutes / SLOT_MINUTES);
-  return { dayIndex, slotIndex, slotCount };
+  const slotIndex = Math.max(0, Math.floor(totalMinutes / SLOT_MINUTES));
+  const slotCount = Math.max(1, Math.ceil(event.durationMinutes / SLOT_MINUTES));
+  return {
+    dayIndex: Math.max(0, Math.min(6, dayIndex)),
+    slotIndex: Math.max(0, Math.min(SLOTS_PER_DAY - 1, slotIndex)),
+    slotCount,
+  };
 }
 
 export function parseParentId(id) {
