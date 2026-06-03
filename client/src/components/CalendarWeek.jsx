@@ -78,8 +78,9 @@ function EventBlock({
 
   const handleDragPointerDown = (e) => {
     if (resizing || e.button > 0) return;
+    if (e.target.closest('.cal-event__delete, .cal-event__resize')) return;
+
     e.stopPropagation();
-    e.preventDefault();
 
     dragStart.current = { x: e.clientX, y: e.clientY };
     dragging.current = false;
@@ -90,9 +91,14 @@ function EventBlock({
         const dy = moveEvent.clientY - dragStart.current.y;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         dragging.current = true;
+        moveEvent.preventDefault();
+        if (document.activeElement?.classList.contains('cal-event__title')) {
+          document.activeElement.blur();
+        }
         onEventDragStart(event, moveEvent.clientX, moveEvent.clientY);
       }
       if (dragging.current) {
+        moveEvent.preventDefault();
         onEventDragMove(moveEvent.clientX, moveEvent.clientY);
       }
     };
@@ -125,13 +131,8 @@ function EventBlock({
     <div
       className={`cal-event${isDraggingThis ? ' cal-event--dragging' : ''}${event.recurrenceType === 'weekly' ? ' cal-event--recurring' : ''}`}
       style={style}
+      onPointerDown={handleDragPointerDown}
     >
-      <button
-        type="button"
-        className="cal-event__drag-handle"
-        aria-label="Drag event"
-        onPointerDown={handleDragPointerDown}
-      />
       <div className="cal-event__body">
         <div className="cal-event__content">
           <input

@@ -463,41 +463,22 @@ select {
   font-size: 0.72rem;
   overflow: hidden;
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
+  flex-direction: column;
   position: relative;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   z-index: 2;
-}
-
-.cal-event__drag-handle {
-  flex-shrink: 0;
-  width: 14px;
-  border: none;
-  background: rgba(0, 0, 0, 0.15);
-  color: rgba(255, 255, 255, 0.85);
   cursor: grab;
-  padding: 0;
   touch-action: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.55rem;
-  letter-spacing: -1px;
 }
 
-.cal-event__drag-handle:active {
+.cal-event:active {
   cursor: grabbing;
-}
-
-.cal-event__drag-handle::before {
-  content: '⋮⋮';
-  line-height: 1;
 }
 
 .cal-event__body {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -510,6 +491,9 @@ select {
   padding: 0.3rem 0.45rem;
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   pointer-events: auto;
 }
 
@@ -566,6 +550,7 @@ select {
   cursor: ns-resize;
   background: rgba(255, 255, 255, 0.35);
   flex-shrink: 0;
+  touch-action: none;
 }
 
 .cal-event--overlay {
