@@ -43,7 +43,9 @@ export function formatSlotTime(slotIndex) {
 export function eventToSlot(event, weekStart) {
   const start = new Date(event.startTime);
   const ws = getWeekStart(weekStart);
-  const dayIndex = Math.floor((start.getTime() - ws.getTime()) / (24 * 60 * 60 * 1000));
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const wsDay = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate());
+  const dayIndex = Math.round((startDay - wsDay) / (24 * 60 * 60 * 1000));
   const totalMinutes = start.getHours() * 60 + start.getMinutes() - DAY_START_HOUR * 60;
   const slotIndex = Math.max(0, Math.floor(totalMinutes / SLOT_MINUTES));
   const slotCount = Math.max(1, Math.ceil(event.durationMinutes / SLOT_MINUTES));
