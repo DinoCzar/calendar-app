@@ -4,12 +4,24 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 const db = require('./db');
 const {
-  getWeekStart,
   expandEventsForWeek,
   parseOccurrenceId,
-  minutesToDate,
+  resolveWeekStartDateStr,
+  minutesToISO,
 } = require('./recurrence');
+const { parseTzOffset, weekStartMs } = require('./calendarTime');
 const { scheduleSmartTasks } = require('./scheduler');
+
+function tzFromReq(req) {
+  return parseTzOffset(req.query.tzOffset ?? req.body?.tzOffset);
+}
+
+function weekStartPayload(weekStartDateStr, tzOffsetMin) {
+  return {
+    weekStart: weekStartDateStr,
+    weekStartTime: new Date(weekStartMs(weekStartDateStr, tzOffsetMin)).toISOString(),
+  };
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,15 +58,16 @@ function rowToEvent(row) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, now: new Date().toISOString() });
+  res.json({ ok: true, now: new Date().toISOString(), commit: process.env.RENDER_GIT_COMMIT || null });
 });
 
 app.get('/api/week', (req, res) => {
-  const weekStart = getWeekStart(req.query.weekStart ? new Date(req.query.weekStart) : new Date());
+  const tzOffsetMin = tzFromReq(req);
+  const weekStartDateStr = resolveWeekStartDateStr(req.query.weekStart, tzOffsetMin);
   const rows = db.prepare('SELECT * FROM calendar_events').all();
-  const events = expandEventsForWeek(rows, weekStart);
+  const events = expandEventsForWeek(rows, weekStartDateStr, tzOffsetMin);
   res.json({
-    weekStart: weekStart.toISOString(),
+    ...weekStartPayload(weekStartDateStr, tzOffsetMin),
     now: new Date().toISOString(),
     events,
   });
@@ -121,14 +134,14 @@ app.put('/api/smart-tasks/reorder', (req, res) => {
 });
 
 app.post('/api/smart-tasks/schedule', (req, res) => {
-  const weekStart = req.body.weekStart ? new Date(req.body.weekStart) : new Date();
-  const result = scheduleSmartTasks(db, weekStart);
-  const ws = getWeekStart(weekStart);
+  const tzOffsetMin = tzFromReq(req);
+  const weekStartDateStr = resolveWeekStartDateStr(req.body.weekStart, tzOffsetMin);
+  const result = scheduleSmartTasks(db, weekStartDateStr, tzOffsetMin);
   const rows = db.prepare('SELECT * FROM calendar_events').all();
   res.json({
     ...result,
-    weekStart: ws.toISOString(),
-    events: expandEventsForWeek(rows, ws),
+    ...weekStartPayload(weekStartDateStr, tzOffsetMin),
+    events: expandEventsForWeek(rows, weekStartDateStr, tzOffsetMin),
     smartTasks: db
       .prepare('SELECT * FROM smart_tasks WHERE status = ? ORDER BY priority ASC')
       .all('pending')
@@ -240,12 +253,16 @@ app.post('/api/events/:id/move', (req, res) => {
   const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(parentId);
   if (!row) return res.status(404).json({ error: 'Not found' });
 
-  const { weekStart, dayIndex, slotIndex, durationMinutes } = req.body;
-  const ws = getWeekStart(new Date(weekStart));
+  const { weekStart, dayIndex, slotIndex, durationMinutes, tzOffset, startTime: clientStart, endTime: clientEnd } =
+    req.body;
+  const tzOffsetMin = parseTzOffset(tzOffset);
+  const weekStartDateStr = resolveWeekStartDateStr(weekStart, tzOffsetMin);
   const startMinutes = 7 * 60 + slotIndex * 30;
   const dur = durationMinutes ?? row.duration_minutes;
-  const start = minutesToDate(ws, dayIndex, startMinutes);
-  const end = new Date(start.getTime() + dur * 60 * 1000);
+  const computedStart = minutesToISO(weekStartDateStr, dayIndex, startMinutes, tzOffsetMin);
+  const computedEnd = new Date(new Date(computedStart).getTime() + dur * 60 * 1000).toISOString();
+  const startTime = clientStart || computedStart;
+  const endTime = clientEnd || computedEnd;
 
   if (row.recurrence_type === 'weekly') {
     db.prepare(`
@@ -256,13 +273,13 @@ app.post('/api/events/:id/move', (req, res) => {
   } else {
     db.prepare(`
       UPDATE calendar_events SET start_time = ?, end_time = ?, duration_minutes = ? WHERE id = ?
-    `).run(start.toISOString(), end.toISOString(), dur, parentId);
+    `).run(startTime, endTime, dur, parentId);
   }
 
   const updated = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(parentId);
   res.json({
     event: rowToEvent(updated),
-    occurrence: expandEventsForWeek([updated], ws).find((o) => o.parentId === parentId),
+    occurrence: expandEventsForWeek([updated], weekStartDateStr, tzOffsetMin).find((o) => o.parentId === parentId),
   });
 });
 
