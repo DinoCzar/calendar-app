@@ -129,7 +129,7 @@ export default function App() {
     setEvents((prev) => prev.map((ev) => (ev.id === event.id ? optimistic : ev)));
 
     try {
-      await moveEvent(parseParentId(event.id), {
+      const result = await moveEvent(parseParentId(event.id), {
         weekStart,
         dayIndex: slot.dayIndex,
         slotIndex: slot.slotIndex,
@@ -137,7 +137,13 @@ export default function App() {
         startTime: optimistic.startTime,
         endTime: optimistic.endTime,
       });
-      await loadWeek(weekStart);
+      if (result?.occurrence) {
+        setEvents((prev) =>
+          prev.map((ev) => (ev.id === event.id ? result.occurrence : ev))
+        );
+      } else {
+        await loadWeek(weekStart);
+      }
     } catch (err) {
       setError(err.message);
       await loadWeek(weekStart);

@@ -58,7 +58,7 @@ function rowToEvent(row) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, now: new Date().toISOString() });
+  res.json({ ok: true, now: new Date().toISOString(), commit: process.env.RENDER_GIT_COMMIT || null });
 });
 
 app.get('/api/week', (req, res) => {
