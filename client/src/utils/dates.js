@@ -24,6 +24,25 @@ export function addWeeks(weekStart, count) {
   return d;
 }
 
+export function addDays(date, count) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + count);
+  return d;
+}
+
+export function isSameDay(a, b) {
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
+export function getDayIndexInWeek(weekStart, date) {
+  const ws = getWeekStart(weekStart);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const wsDay = new Date(ws);
+  wsDay.setHours(0, 0, 0, 0);
+  return Math.round((target - wsDay) / (24 * 60 * 60 * 1000));
+}
+
 export function isSameWeek(a, b) {
   return getWeekStart(a).toDateString() === getWeekStart(b).toDateString();
 }

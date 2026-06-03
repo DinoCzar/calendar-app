@@ -28,6 +28,9 @@ import {
 import {
   getWeekStart,
   addWeeks,
+  addDays,
+  isSameWeek,
+  getDayDate,
   parseParentId,
   EVENT_COLORS,
   SLOT_HEIGHT,
@@ -51,6 +54,8 @@ export default function App() {
   const [previewEvents, setPreviewEvents] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [hoverSlot, setHoverSlot] = useState(null);
+  const [viewMode, setViewMode] = useState('week');
+  const [focusDate, setFocusDate] = useState(() => new Date());
 
   const loadWeek = useCallback(async (ws) => {
     const data = await fetchWeek(ws);
@@ -226,13 +231,15 @@ export default function App() {
       await createEvent({ color: EVENT_COLORS[0], ...data });
 
       if (data.startTime) {
-        const eventWeekStart = getWeekStart(new Date(data.startTime));
+        const eventDate = new Date(data.startTime);
+        const eventWeekStart = getWeekStart(eventDate);
         if (eventWeekStart.toDateString() !== weekStart.toDateString()) {
           setWeekStart(eventWeekStart);
           await loadWeek(eventWeekStart);
         } else {
           await loadWeek(weekStart);
         }
+        if (viewMode === 'day') setFocusDate(eventDate);
       } else {
         await loadWeek(weekStart);
       }
@@ -255,6 +262,42 @@ export default function App() {
     }
   };
 
+  const handlePrev = () => {
+    if (viewMode === 'week') {
+      setWeekStart((w) => addWeeks(w, -1));
+      return;
+    }
+    const next = addDays(focusDate, -1);
+    setFocusDate(next);
+    if (!isSameWeek(weekStart, next)) setWeekStart(getWeekStart(next));
+  };
+
+  const handleNext = () => {
+    if (viewMode === 'week') {
+      setWeekStart((w) => addWeeks(w, 1));
+      return;
+    }
+    const next = addDays(focusDate, 1);
+    setFocusDate(next);
+    if (!isSameWeek(weekStart, next)) setWeekStart(getWeekStart(next));
+  };
+
+  const handleToday = () => {
+    setWeekStart(getWeekStart(now));
+    setFocusDate(new Date(now));
+  };
+
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    if (mode !== 'day') return;
+
+    if (isSameWeek(weekStart, now)) {
+      setFocusDate(new Date(now));
+    } else {
+      setFocusDate(getDayDate(weekStart, 0));
+    }
+  };
+
   if (loading) {
     return <div className="app app--loading"><p>Loading calendar…</p></div>;
   }
@@ -274,12 +317,15 @@ export default function App() {
             weekStart={weekStart}
             now={now}
             events={previewEvents ?? events}
+            viewMode={viewMode}
+            focusDate={focusDate}
             isDragging={isDragging}
             draggingEventId={draggingEventId}
             hoverSlot={hoverSlot}
-            onPrevWeek={() => setWeekStart((w) => addWeeks(w, -1))}
-            onNextWeek={() => setWeekStart((w) => addWeeks(w, 1))}
-            onToday={() => setWeekStart(getWeekStart(now))}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            onToday={handleToday}
+            onViewModeChange={handleViewModeChange}
             onCreateEvent={() => setCreateDialogOpen(true)}
             onResize={handleResize}
             onDelete={handleDeleteEvent}
@@ -326,6 +372,7 @@ export default function App() {
         open={createDialogOpen}
         weekStart={weekStart}
         now={now}
+        defaultFocusDate={viewMode === 'day' ? focusDate : null}
         onClose={() => setCreateDialogOpen(false)}
         onCreate={handleCreateEvent}
       />

@@ -9,11 +9,13 @@ import {
   formatSlotTime,
   getWeekStart,
   eventToSlot,
+  getDayIndexInWeek,
+  isSameDay,
 } from '../utils/dates';
 
 const DRAG_THRESHOLD = 8;
 
-function CalendarSlot({ dayIndex, slotIndex, isToday, isPast, isHoverTarget }) {
+function CalendarSlot({ dayIndex, slotIndex, gridColumn, isToday, isPast, isHoverTarget }) {
   return (
     <div
       data-day-index={dayIndex}
@@ -24,7 +26,7 @@ function CalendarSlot({ dayIndex, slotIndex, isToday, isPast, isHoverTarget }) {
         isPast && 'cal-slot--past',
         isHoverTarget && 'cal-slot--over',
       ].filter(Boolean).join(' ')}
-      style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}
+      style={{ gridColumn, gridRow: slotIndex + 2 }}
     />
   );
 }
@@ -32,6 +34,7 @@ function CalendarSlot({ dayIndex, slotIndex, isToday, isPast, isHoverTarget }) {
 function EventBlock({
   event,
   weekStart,
+  gridColumn,
   isDraggingThis,
   onResize,
   onDelete,
@@ -110,7 +113,7 @@ function EventBlock({
   };
 
   const style = {
-    gridColumn: dayIndex + 2,
+    gridColumn,
     gridRow: `${slotIndex + 2} / span ${slotCount}`,
     opacity: isDraggingThis ? 0.25 : 1,
     backgroundColor: event.color,
@@ -157,9 +160,10 @@ function EventBlock({
   );
 }
 
-function NowLine({ weekStart, now }) {
+function NowLine({ weekStart, now, viewMode, focusDayIndex, gridColumn }) {
   const todayIndex = Math.round((now - weekStart) / (24 * 60 * 60 * 1000));
   if (todayIndex < 0 || todayIndex > 6) return null;
+  if (viewMode === 'day' && focusDayIndex !== todayIndex) return null;
 
   const minutes = now.getHours() * 60 + now.getMinutes() - DAY_START_HOUR * 60;
   if (minutes < 0 || minutes >= SLOTS_PER_DAY * SLOT_MINUTES) return null;
@@ -167,7 +171,7 @@ function NowLine({ weekStart, now }) {
   const top = (minutes / 30) * SLOT_HEIGHT;
 
   return (
-    <div className="now-line" style={{ gridColumn: todayIndex + 2, gridRow: '2 / -1', top }}>
+    <div className="now-line" style={{ gridColumn, gridRow: '2 / -1', top }}>
       <div className="now-line__dot" />
       <div className="now-line__bar" />
     </div>
@@ -178,12 +182,15 @@ export default function CalendarWeek({
   weekStart,
   now,
   events,
+  viewMode = 'week',
+  focusDate,
   isDragging,
   draggingEventId,
   hoverSlot,
-  onPrevWeek,
-  onNextWeek,
+  onPrev,
+  onNext,
   onToday,
+  onViewModeChange,
   onCreateEvent,
   onResize,
   onDelete,
@@ -193,25 +200,58 @@ export default function CalendarWeek({
   onEventDragEnd,
 }) {
   const todayStr = now.toDateString();
-  const viewingCurrent = weekStart.toDateString() === getWeekStart(now).toDateString();
+  const viewingCurrentWeek = weekStart.toDateString() === getWeekStart(now).toDateString();
+  const focusDayIndex = Math.max(0, Math.min(6, getDayIndexInWeek(weekStart, focusDate ?? now)));
+  const isDayView = viewMode === 'day';
+  const dayColumns = isDayView ? [focusDayIndex] : DAY_NAMES.map((_, i) => i);
+  const viewingToday = isDayView ? isSameDay(focusDate, now) : viewingCurrentWeek;
+  const focusDayDate = getDayDate(weekStart, focusDayIndex);
+  const navLabelPrev = isDayView ? 'Previous day' : 'Previous week';
+  const navLabelNext = isDayView ? 'Next day' : 'Next week';
+
+  const visibleEvents = isDayView
+    ? events.filter((event) => eventToSlot(event, weekStart).dayIndex === focusDayIndex)
+    : events;
+
+  const title = isDayView
+    ? (viewingToday ? 'Today' : focusDayDate.toLocaleDateString(undefined, { weekday: 'long' }))
+    : (viewingCurrentWeek ? 'This Week' : 'Week View');
+
+  const subtitle = isDayView
+    ? focusDayDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+    : `${getDayDate(weekStart, 0).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${getDayDate(weekStart, 6).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   return (
-    <section className={`calendar${isDragging ? ' calendar--dragging' : ''}`}>
+    <section className={`calendar${isDragging ? ' calendar--dragging' : ''}${isDayView ? ' calendar--day' : ''}`}>
       <header className="calendar__header">
         <div className="calendar__nav">
-          <button type="button" className="icon-btn" onClick={onPrevWeek} aria-label="Previous week">‹</button>
+          <button type="button" className="icon-btn" onClick={onPrev} aria-label={navLabelPrev}>‹</button>
           <div className="calendar__title">
-            <h1>{viewingCurrent ? 'This Week' : 'Week View'}</h1>
-            <p>
-              {getDayDate(weekStart, 0).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              {' – '}
-              {getDayDate(weekStart, 6).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-            </p>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
           </div>
-          <button type="button" className="icon-btn" onClick={onNextWeek} aria-label="Next week">›</button>
+          <button type="button" className="icon-btn" onClick={onNext} aria-label={navLabelNext}>›</button>
         </div>
         <div className="calendar__actions">
-          {!viewingCurrent && (
+          <div className="view-toggle" role="group" aria-label="Calendar view">
+            <button
+              type="button"
+              className={`view-toggle__btn${isDayView ? ' view-toggle__btn--active' : ''}`}
+              onClick={() => onViewModeChange('day')}
+              aria-pressed={isDayView}
+            >
+              Day
+            </button>
+            <button
+              type="button"
+              className={`view-toggle__btn${!isDayView ? ' view-toggle__btn--active' : ''}`}
+              onClick={() => onViewModeChange('week')}
+              aria-pressed={!isDayView}
+            >
+              Week
+            </button>
+          </div>
+          {!viewingToday && (
             <button type="button" className="btn btn--ghost" onClick={onToday}>Today</button>
           )}
           <button type="button" className="btn btn--secondary" onClick={onCreateEvent}>+ Event</button>
@@ -220,20 +260,21 @@ export default function CalendarWeek({
 
       <div className="calendar__scroll">
         <div
-          className="calendar__grid"
+          className={`calendar__grid${isDayView ? ' calendar__grid--day' : ''}`}
           style={{ gridTemplateRows: `auto repeat(${SLOTS_PER_DAY}, ${SLOT_HEIGHT}px)` }}
         >
           <div className="calendar__corner" />
-          {DAY_NAMES.map((name, i) => {
-            const date = getDayDate(weekStart, i);
+          {dayColumns.map((dayIndex, columnOffset) => {
+            const date = getDayDate(weekStart, dayIndex);
             const isToday = date.toDateString() === todayStr;
+            const gridColumn = columnOffset + 2;
             return (
               <div
-                key={name}
+                key={dayIndex}
                 className={`cal-day-header${isToday ? ' cal-day-header--today' : ''}`}
-                style={{ gridColumn: i + 2, gridRow: 1 }}
+                style={{ gridColumn, gridRow: 1 }}
               >
-                <span className="cal-day-header__name">{name}</span>
+                <span className="cal-day-header__name">{DAY_NAMES[dayIndex]}</span>
                 <span className="cal-day-header__date">{date.getDate()}</span>
               </div>
             );
@@ -246,17 +287,19 @@ export default function CalendarWeek({
           ))}
 
           {Array.from({ length: SLOTS_PER_DAY }, (_, slotIndex) =>
-            DAY_NAMES.map((_, dayIndex) => {
+            dayColumns.map((dayIndex, columnOffset) => {
               const date = getDayDate(weekStart, dayIndex);
               const isToday = date.toDateString() === todayStr;
               const slotDate = new Date(date);
               const slotMinutes = DAY_START_HOUR * 60 + slotIndex * SLOT_MINUTES;
               slotDate.setHours(Math.floor(slotMinutes / 60), slotMinutes % 60, 0, 0);
+              const gridColumn = columnOffset + 2;
               return (
                 <CalendarSlot
                   key={`${dayIndex}-${slotIndex}`}
                   dayIndex={dayIndex}
                   slotIndex={slotIndex}
+                  gridColumn={gridColumn}
                   isToday={isToday}
                   isPast={slotDate < now}
                   isHoverTarget={
@@ -267,22 +310,34 @@ export default function CalendarWeek({
             })
           )}
 
-          {events.map((event) => (
-            <EventBlock
-              key={event.id}
-              event={event}
-              weekStart={weekStart}
-              isDraggingThis={draggingEventId === event.id}
-              onResize={onResize}
-              onDelete={onDelete}
-              onTitleChange={onTitleChange}
-              onEventDragStart={onEventDragStart}
-              onEventDragMove={onEventDragMove}
-              onEventDragEnd={onEventDragEnd}
-            />
-          ))}
+          {visibleEvents.map((event) => {
+            const { dayIndex } = eventToSlot(event, weekStart);
+            const columnOffset = isDayView ? 0 : dayIndex;
+            const gridColumn = columnOffset + 2;
+            return (
+              <EventBlock
+                key={event.id}
+                event={event}
+                weekStart={weekStart}
+                gridColumn={gridColumn}
+                isDraggingThis={draggingEventId === event.id}
+                onResize={onResize}
+                onDelete={onDelete}
+                onTitleChange={onTitleChange}
+                onEventDragStart={onEventDragStart}
+                onEventDragMove={onEventDragMove}
+                onEventDragEnd={onEventDragEnd}
+              />
+            );
+          })}
 
-          <NowLine weekStart={weekStart} now={now} />
+          <NowLine
+            weekStart={weekStart}
+            now={now}
+            viewMode={viewMode}
+            focusDayIndex={focusDayIndex}
+            gridColumn={isDayView ? 2 : Math.round((now - weekStart) / (24 * 60 * 60 * 1000)) + 2}
+          />
         </div>
       </div>
     </section>
