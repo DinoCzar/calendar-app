@@ -363,16 +363,26 @@ select {
   font-size: 0.65rem;
   color: var(--text-muted);
   text-align: right;
-  padding: 0 0.5rem;
-  border-bottom: 1px solid var(--border);
-  transform: translateY(-50%);
+  padding: 2px 0.5rem 0 0;
   white-space: nowrap;
+  line-height: 1;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(229, 229, 234, 0.7);
 }
 
 .cal-slot {
   border-bottom: 1px solid rgba(229, 229, 234, 0.7);
   border-left: 1px solid var(--border);
+  height: 28px;
   min-height: 28px;
+  max-height: 28px;
+  box-sizing: border-box;
   z-index: 0;
 }
 
