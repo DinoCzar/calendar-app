@@ -8,6 +8,8 @@ const {
   parseOccurrenceId,
   resolveWeekStartDateStr,
   minutesToISO,
+  DAY_START_HOUR,
+  SLOT_MINUTES,
 } = require('./recurrence');
 const { parseTzOffset, weekStartMs } = require('./calendarTime');
 const { scheduleSmartTasks } = require('./scheduler');
@@ -257,7 +259,7 @@ app.post('/api/events/:id/move', (req, res) => {
     req.body;
   const tzOffsetMin = parseTzOffset(tzOffset);
   const weekStartDateStr = resolveWeekStartDateStr(weekStart, tzOffsetMin);
-  const startMinutes = 7 * 60 + slotIndex * 30;
+  const startMinutes = DAY_START_HOUR * 60 + slotIndex * SLOT_MINUTES;
   const dur = durationMinutes ?? row.duration_minutes;
   const computedStart = minutesToISO(weekStartDateStr, dayIndex, startMinutes, tzOffsetMin);
   const computedEnd = new Date(new Date(computedStart).getTime() + dur * 60 * 1000).toISOString();

@@ -1,7 +1,10 @@
 export const SLOT_MINUTES = 30;
 export const DAY_START_HOUR = 7;
-export const DAY_END_HOUR = 21;
-export const SLOTS_PER_DAY = ((DAY_END_HOUR - DAY_START_HOUR) * 60) / SLOT_MINUTES;
+export const DAY_END_HOUR = 23;
+export const DAY_END_MINUTE = 30;
+export const DAY_START_MINUTES = DAY_START_HOUR * 60;
+export const DAY_END_MINUTES = DAY_END_HOUR * 60 + DAY_END_MINUTE;
+export const SLOTS_PER_DAY = (DAY_END_MINUTES - DAY_START_MINUTES) / SLOT_MINUTES;
 export const SLOT_HEIGHT = 28;
 
 export const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -19,6 +22,25 @@ export function addWeeks(weekStart, count) {
   const d = new Date(weekStart);
   d.setDate(d.getDate() + count * 7);
   return d;
+}
+
+export function addDays(date, count) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + count);
+  return d;
+}
+
+export function isSameDay(a, b) {
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
+export function getDayIndexInWeek(weekStart, date) {
+  const ws = getWeekStart(weekStart);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const wsDay = new Date(ws);
+  wsDay.setHours(0, 0, 0, 0);
+  return Math.round((target - wsDay) / (24 * 60 * 60 * 1000));
 }
 
 export function isSameWeek(a, b) {
@@ -117,7 +139,7 @@ export function getDefaultEventDate(weekStart, now = new Date()) {
 }
 
 export const TIME_SLOT_OPTIONS = Array.from(
-  { length: ((DAY_END_HOUR - DAY_START_HOUR) * 60) / SLOT_MINUTES },
+  { length: SLOTS_PER_DAY },
   (_, i) => {
     const minutes = DAY_START_HOUR * 60 + i * SLOT_MINUTES;
     const h = Math.floor(minutes / 60);

@@ -16,7 +16,7 @@ function formatTimeLabel(minutes) {
   return TIME_SLOT_OPTIONS.find((o) => o.value === minutes)?.label ?? '';
 }
 
-export default function EventCreateDialog({ open, weekStart, now, onClose, onCreate }) {
+export default function EventCreateDialog({ open, weekStart, now, defaultFocusDate, onClose, onCreate }) {
   const [title, setTitle] = useState('New Event');
   const [date, setDate] = useState('');
   const [startMinutes, setStartMinutes] = useState(DEFAULT_START_MINUTES);
@@ -26,14 +26,16 @@ export default function EventCreateDialog({ open, weekStart, now, onClose, onCre
 
   useEffect(() => {
     if (!open) return;
-    const defaultDate = getDefaultEventDate(weekStart, now);
+    const defaultDate = defaultFocusDate
+      ? new Date(defaultFocusDate)
+      : getDefaultEventDate(weekStart, now);
     setTitle('New Event');
     setDate(toDateInputValue(defaultDate));
     setStartMinutes(DEFAULT_START_MINUTES);
     setDurationMinutes(60);
     setRecurrenceType('none');
     setSubmitting(false);
-  }, [open, weekStart, now]);
+  }, [open, weekStart, now, defaultFocusDate]);
 
   useEffect(() => {
     if (!open) return;
