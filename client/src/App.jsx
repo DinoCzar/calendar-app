@@ -20,6 +20,7 @@ import {
   deleteSmartTask,
   reorderSmartTasks,
   scheduleSmartTasks,
+  recallSmartTasks,
   createEvent,
   moveEvent,
   updateEvent,
@@ -47,6 +48,7 @@ export default function App() {
   const [smartTasks, setSmartTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scheduling, setScheduling] = useState(false);
+  const [recalling, setRecalling] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [draggingEventId, setDraggingEventId] = useState(null);
   const [dragPointer, setDragPointer] = useState(null);
@@ -263,6 +265,19 @@ export default function App() {
     }
   };
 
+  const handleRecall = async () => {
+    setRecalling(true);
+    try {
+      const result = await recallSmartTasks(weekStart);
+      setEvents(result.events);
+      setSmartTasks(result.smartTasks);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRecalling(false);
+    }
+  };
+
   const handlePrev = () => {
     if (viewMode === 'week') {
       setWeekStart((w) => addWeeks(w, -1));
@@ -350,7 +365,9 @@ export default function App() {
               await loadSmartTasks();
             }}
             onSchedule={handleSchedule}
+            onRecall={handleRecall}
             scheduling={scheduling}
+            recalling={recalling}
           />
         </main>
       </DndContext>

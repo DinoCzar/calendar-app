@@ -74,6 +74,14 @@ export const scheduleSmartTasks = useLocal
         body: JSON.stringify(withTz({ weekStart: weekStartDate(weekStart) })),
       });
 
+export const recallSmartTasks = useLocal
+  ? localStore.recallSmartTasks
+  : (weekStart) =>
+      request('/smart-tasks/recall', {
+        method: 'POST',
+        body: JSON.stringify(withTz({ weekStart: weekStartDate(weekStart) })),
+      });
+
 export const createEvent = useLocal
   ? localStore.createEvent
   : (data) => request('/events', { method: 'POST', body: JSON.stringify(data) });

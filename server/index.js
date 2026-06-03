@@ -14,7 +14,7 @@ const {
   SLOT_MINUTES,
 } = require('./recurrence');
 const { parseTzOffset, weekStartMs } = require('./calendarTime');
-const { scheduleSmartTasks } = require('./scheduler');
+const { scheduleSmartTasks, recallSmartTasks } = require('./scheduler');
 
 function tzFromReq(req) {
   return parseTzOffset(req.query.tzOffset ?? req.body?.tzOffset);
@@ -142,6 +142,22 @@ app.post('/api/smart-tasks/schedule', (req, res) => {
   const tzOffsetMin = tzFromReq(req);
   const weekStartDateStr = resolveWeekStartDateStr(req.body.weekStart, tzOffsetMin);
   const result = scheduleSmartTasks(db, weekStartDateStr, tzOffsetMin);
+  const rows = db.prepare('SELECT * FROM calendar_events').all();
+  res.json({
+    ...result,
+    ...weekStartPayload(weekStartDateStr, tzOffsetMin),
+    events: expandEventsForWeek(rows, weekStartDateStr, tzOffsetMin),
+    smartTasks: db
+      .prepare('SELECT * FROM smart_tasks WHERE status = ? ORDER BY priority ASC')
+      .all('pending')
+      .map(rowToSmartTask),
+  });
+});
+
+app.post('/api/smart-tasks/recall', (req, res) => {
+  const tzOffsetMin = tzFromReq(req);
+  const weekStartDateStr = resolveWeekStartDateStr(req.body.weekStart, tzOffsetMin);
+  const result = recallSmartTasks(db);
   const rows = db.prepare('SELECT * FROM calendar_events').all();
   res.json({
     ...result,

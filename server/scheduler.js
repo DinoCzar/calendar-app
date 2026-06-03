@@ -139,10 +139,32 @@ function scheduleSmartTasks(db, weekStartParam, tzOffsetMin, now = new Date()) {
   return { scheduled };
 }
 
+function recallSmartTasks(db) {
+  const scheduled = db.prepare("SELECT * FROM smart_tasks WHERE status = 'scheduled'").all();
+  let recalled = 0;
+
+  const tx = db.transaction(() => {
+    for (const task of scheduled) {
+      db.prepare('DELETE FROM calendar_events WHERE from_smart_task_id = ?').run(task.id);
+      if (task.scheduled_event_id) {
+        db.prepare('DELETE FROM calendar_events WHERE id = ?').run(task.scheduled_event_id);
+      }
+      db.prepare(`
+        UPDATE smart_tasks SET status = 'pending', scheduled_event_id = NULL WHERE id = ?
+      `).run(task.id);
+      recalled++;
+    }
+  });
+
+  tx();
+  return { recalled };
+}
+
 module.exports = {
   buildOccupancy,
   findFirstSlot,
   slotToTimes,
   scheduleSmartTasks,
+  recallSmartTasks,
   SLOTS_PER_DAY,
 };

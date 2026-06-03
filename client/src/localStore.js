@@ -278,6 +278,33 @@ export function scheduleSmartTasks(weekStart) {
   });
 }
 
+export function recallSmartTasks(weekStart) {
+  const data = loadData();
+  let recalled = 0;
+
+  for (const task of data.smartTasks) {
+    if (task.status !== 'scheduled') continue;
+    data.events = data.events.filter(
+      (event) => event.from_smart_task_id !== task.id && event.id !== task.scheduled_event_id
+    );
+    task.status = 'pending';
+    task.scheduled_event_id = null;
+    recalled++;
+  }
+
+  saveData(data);
+  const ws = getWeekStart(new Date(weekStart));
+  return Promise.resolve({
+    recalled,
+    weekStart: ws.toISOString(),
+    events: expandEventsForWeek(data.events, ws),
+    smartTasks: data.smartTasks
+      .filter((t) => t.status === 'pending')
+      .sort((a, b) => a.priority - b.priority)
+      .map(rowToSmartTask),
+  });
+}
+
 export function createEvent({
   title = 'New event',
   description = '',
