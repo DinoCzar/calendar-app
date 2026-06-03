@@ -1,0 +1,6 @@
+node_modules/
+server/calendar.db
+server/calendar.db-wal
+server/calendar.db-shm
+client/dist/
+.DS_Store
