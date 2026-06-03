@@ -3,14 +3,9 @@ const {
   DAY_START_HOUR,
   DAY_END_HOUR,
   getWeekStart,
-  resolveWeekStartDateStr,
+  minutesToDate,
   expandEventsForWeek,
-  occurrenceToSlot,
-  minutesToISO,
-  isoToLocalMinutes,
-  isoToDayIndex,
 } = require('./recurrence');
-const { getWeekStartDateStr } = require('./calendarTime');
 
 const SLOTS_PER_DAY = ((DAY_END_HOUR - DAY_START_HOUR) * 60) / SLOT_MINUTES;
 
@@ -23,11 +18,16 @@ function blockSlots(grid, dayIndex, slotIndex, slotCount) {
   }
 }
 
-function buildOccupancy(occurrences, weekStartParam, tzOffsetMin) {
+function buildOccupancy(occurrences, weekStart) {
+  const ws = getWeekStart(weekStart);
   const grid = Array.from({ length: 7 }, () => Array(SLOTS_PER_DAY).fill(false));
 
   for (const occ of occurrences) {
-    const { dayIndex, slotIndex, slotCount } = occurrenceToSlot(occ, weekStartParam, tzOffsetMin);
+    const start = new Date(occ.startTime);
+    const dayIndex = Math.floor((start - ws) / (24 * 60 * 60 * 1000));
+    const totalMinutes = start.getHours() * 60 + start.getMinutes() - DAY_START_HOUR * 60;
+    const slotIndex = Math.floor(totalMinutes / SLOT_MINUTES);
+    const slotCount = Math.ceil(occ.durationMinutes / SLOT_MINUTES);
     blockSlots(grid, dayIndex, slotIndex, slotCount);
   }
 
@@ -52,22 +52,22 @@ function findFirstSlot(grid, durationMinutes) {
   return null;
 }
 
-function slotToTimes(weekStartParam, dayIndex, slotIndex, durationMinutes, tzOffsetMin) {
-  const weekStartDateStr = resolveWeekStartDateStr(weekStartParam, tzOffsetMin);
+function slotToTimes(weekStart, dayIndex, slotIndex, durationMinutes) {
+  const ws = getWeekStart(weekStart);
   const startMinutes = DAY_START_HOUR * 60 + slotIndex * SLOT_MINUTES;
-  const startTime = minutesToISO(weekStartDateStr, dayIndex, startMinutes, tzOffsetMin);
-  const endTime = new Date(new Date(startTime).getTime() + durationMinutes * 60 * 1000).toISOString();
-  return { startTime, endTime };
+  const start = minutesToDate(ws, dayIndex, startMinutes);
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+  return { startTime: start.toISOString(), endTime: end.toISOString() };
 }
 
-function markPastSlots(grid, weekStartParam, now, tzOffsetMin) {
-  const weekStartDateStr = resolveWeekStartDateStr(weekStartParam, tzOffsetMin);
-  const currentWeekDateStr = getWeekStartDateStr(now, tzOffsetMin);
+function markPastSlots(grid, weekStart, now) {
+  const ws = getWeekStart(weekStart);
+  const currentWeek = getWeekStart(now);
 
-  if (weekStartDateStr !== currentWeekDateStr) return;
+  if (ws.getTime() !== currentWeek.getTime()) return;
 
-  const todayIndex = isoToDayIndex(now.toISOString(), weekStartDateStr, tzOffsetMin);
-  const nowMinutes = isoToLocalMinutes(now.toISOString(), tzOffsetMin);
+  const todayIndex = Math.floor((now - ws) / (24 * 60 * 60 * 1000));
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const nowSlot = Math.ceil((nowMinutes - DAY_START_HOUR * 60) / SLOT_MINUTES);
 
   for (let day = 0; day < 7; day++) {
@@ -81,17 +81,17 @@ function markPastSlots(grid, weekStartParam, now, tzOffsetMin) {
   }
 }
 
-function scheduleSmartTasks(db, weekStartParam, tzOffsetMin, now = new Date()) {
-  const ws = getWeekStart(weekStartParam, tzOffsetMin);
-  const currentWeek = getWeekStart(now, tzOffsetMin);
-  if (ws.getTime() < currentWeek.getTime()) {
+function scheduleSmartTasks(db, weekStart, now = new Date()) {
+  const ws = getWeekStart(weekStart);
+  const currentWeek = getWeekStart(now);
+  if (ws < currentWeek) {
     return { scheduled: [], skipped: 'past_week' };
   }
 
   const events = db.prepare('SELECT * FROM calendar_events').all();
-  const occurrences = expandEventsForWeek(events, weekStartParam, tzOffsetMin);
-  const grid = buildOccupancy(occurrences, weekStartParam, tzOffsetMin);
-  markPastSlots(grid, weekStartParam, now, tzOffsetMin);
+  const occurrences = expandEventsForWeek(events, ws);
+  const grid = buildOccupancy(occurrences, ws);
+  markPastSlots(grid, ws, now);
 
   const pending = db
     .prepare('SELECT * FROM smart_tasks WHERE status = ? ORDER BY priority ASC')
@@ -113,7 +113,7 @@ function scheduleSmartTasks(db, weekStartParam, tzOffsetMin, now = new Date()) {
       const slot = findFirstSlot(grid, task.duration_minutes);
       if (!slot) break;
 
-      const times = slotToTimes(weekStartParam, slot.dayIndex, slot.slotIndex, task.duration_minutes, tzOffsetMin);
+      const times = slotToTimes(ws, slot.dayIndex, slot.slotIndex, task.duration_minutes);
       const eventId = `ev-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       insertEvent.run(

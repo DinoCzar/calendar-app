@@ -1,39 +1,41 @@
-const {
-  DAY_MS,
-  resolveWeekStartDateStr,
-  weekStartMs,
-  minutesToISO,
-  isoToLocalMinutes,
-  isoToDayIndex,
-} = require('./calendarTime');
-
 const SLOT_MINUTES = 30;
 const DAY_START_HOUR = 7;
 const DAY_END_HOUR = 21;
-const SLOTS_PER_DAY = ((DAY_END_HOUR - DAY_START_HOUR) * 60) / SLOT_MINUTES;
 
-function getWeekStart(date, tzOffsetMin) {
-  const dateStr = resolveWeekStartDateStr(date, tzOffsetMin);
-  return new Date(weekStartMs(dateStr, tzOffsetMin));
+function getWeekStart(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
 }
 
-function getWeekEnd(weekStartDateStr, tzOffsetMin) {
-  const ws = weekStartMs(weekStartDateStr, tzOffsetMin);
-  return new Date(ws + 7 * DAY_MS);
+function getWeekEnd(weekStart) {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 7);
+  return end;
 }
 
-function minutesToDate(weekStartDateStr, dayIndex, minutesFromMidnight, tzOffsetMin) {
-  return new Date(minutesToISO(weekStartDateStr, dayIndex, minutesFromMidnight, tzOffsetMin));
+function minutesToDate(weekStart, dayIndex, minutesFromMidnight) {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + dayIndex);
+  const h = Math.floor(minutesFromMidnight / 60);
+  const m = minutesFromMidnight % 60;
+  d.setHours(h, m, 0, 0);
+  return d;
 }
 
-function expandEventForWeek(event, weekStartParam, tzOffsetMin) {
-  const weekStartDateStr = resolveWeekStartDateStr(weekStartParam, tzOffsetMin);
-  const ws = weekStartMs(weekStartDateStr, tzOffsetMin);
-  const we = ws + 7 * DAY_MS;
+function dateToMinutes(date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function expandEventForWeek(event, weekStart) {
+  const ws = getWeekStart(weekStart);
 
   if (event.recurrence_type === 'weekly') {
     const dayIndex = event.recurrence_day_of_week;
-    const start = minutesToDate(weekStartDateStr, dayIndex, event.recurrence_start_minutes, tzOffsetMin);
+    const start = minutesToDate(ws, dayIndex, event.recurrence_start_minutes);
     const end = new Date(start.getTime() + event.duration_minutes * 60 * 1000);
     return {
       id: `${event.id}-w${dayIndex}`,
@@ -53,8 +55,9 @@ function expandEventForWeek(event, weekStartParam, tzOffsetMin) {
 
   const start = new Date(event.start_time);
   const end = new Date(event.end_time);
+  const we = getWeekEnd(ws);
 
-  if (start.getTime() >= we || end.getTime() <= ws) return null;
+  if (start >= we || end <= ws) return null;
 
   return {
     id: event.id,
@@ -70,10 +73,10 @@ function expandEventForWeek(event, weekStartParam, tzOffsetMin) {
   };
 }
 
-function expandEventsForWeek(events, weekStartParam, tzOffsetMin) {
+function expandEventsForWeek(events, weekStart) {
   const occurrences = [];
   for (const event of events) {
-    const occ = expandEventForWeek(event, weekStartParam, tzOffsetMin);
+    const occ = expandEventForWeek(event, weekStart);
     if (occ) occurrences.push(occ);
   }
   return occurrences.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
@@ -84,28 +87,14 @@ function parseOccurrenceId(id) {
   return match ? match[1] : String(id);
 }
 
-function occurrenceToSlot(occurrence, weekStartParam, tzOffsetMin) {
-  const weekStartDateStr = resolveWeekStartDateStr(weekStartParam, tzOffsetMin);
-  const dayIndex = isoToDayIndex(occurrence.startTime, weekStartDateStr, tzOffsetMin);
-  const localMinutes = isoToLocalMinutes(occurrence.startTime, tzOffsetMin);
-  const slotIndex = Math.floor((localMinutes - DAY_START_HOUR * 60) / SLOT_MINUTES);
-  const slotCount = Math.ceil(occurrence.durationMinutes / SLOT_MINUTES);
-  return { dayIndex, slotIndex, slotCount };
-}
-
 module.exports = {
   SLOT_MINUTES,
   DAY_START_HOUR,
   DAY_END_HOUR,
-  SLOTS_PER_DAY,
   getWeekStart,
   getWeekEnd,
   minutesToDate,
-  minutesToISO,
-  resolveWeekStartDateStr,
+  dateToMinutes,
   expandEventsForWeek,
   parseOccurrenceId,
-  occurrenceToSlot,
-  isoToLocalMinutes,
-  isoToDayIndex,
 };
