@@ -6,6 +6,8 @@ import {
   expandEventsForWeek,
   minutesToDate,
   parseOccurrenceId,
+  parseOccurrenceDayIndex,
+  isRecurringType,
   rowToEvent,
 } from './utils/recurrence';
 
@@ -30,6 +32,7 @@ function defaultData() {
         end_time: null,
         recurrence_type: 'weekly',
         recurrence_day_of_week: 0,
+        recurrence_days_mask: 1,
         recurrence_start_minutes: 9 * 60,
         duration_minutes: 30,
         from_smart_task_id: null,
@@ -284,6 +287,7 @@ export function createEvent({
   durationMinutes = 60,
   recurrenceType = 'none',
   recurrenceDayOfWeek,
+  recurrenceDaysMask,
   recurrenceStartMinutes,
 }) {
   const data = loadData();
@@ -293,11 +297,17 @@ export function createEvent({
     title,
     description,
     color,
-    start_time: recurrenceType === 'weekly' ? null : startTime,
-    end_time: recurrenceType === 'weekly' ? null : endTime,
-    recurrence_type: recurrenceType === 'weekly' ? 'weekly' : 'none',
+    start_time: isRecurringType(recurrenceType) ? null : startTime,
+    end_time: isRecurringType(recurrenceType) ? null : endTime,
+    recurrence_type: isRecurringType(recurrenceType) ? recurrenceType : 'none',
     recurrence_day_of_week: recurrenceType === 'weekly' ? recurrenceDayOfWeek : null,
-    recurrence_start_minutes: recurrenceType === 'weekly' ? recurrenceStartMinutes : null,
+    recurrence_days_mask:
+      recurrenceType === 'weekly_days'
+        ? recurrenceDaysMask
+        : recurrenceType === 'weekly'
+          ? (1 << recurrenceDayOfWeek)
+          : null,
+    recurrence_start_minutes: isRecurringType(recurrenceType) ? recurrenceStartMinutes : null,
     duration_minutes: durationMinutes,
     from_smart_task_id: null,
   };
@@ -316,7 +326,7 @@ export function updateEvent(id, patch) {
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.color !== undefined) row.color = patch.color;
 
-  if (row.recurrence_type === 'weekly') {
+  if (isRecurringType(row.recurrence_type)) {
     if (patch.recurrenceDayOfWeek !== undefined) row.recurrence_day_of_week = patch.recurrenceDayOfWeek;
     if (patch.recurrenceStartMinutes !== undefined) row.recurrence_start_minutes = patch.recurrenceStartMinutes;
     if (patch.durationMinutes !== undefined) row.duration_minutes = patch.durationMinutes;
@@ -342,10 +352,25 @@ export function moveEvent(id, { weekStart, dayIndex, slotIndex, durationMinutes 
   const start = minutesToDate(ws, dayIndex, startMinutes);
   const end = new Date(start.getTime() + dur * 60 * 1000);
 
-  if (row.recurrence_type === 'weekly') {
-    row.recurrence_day_of_week = dayIndex;
-    row.recurrence_start_minutes = startMinutes;
-    row.duration_minutes = dur;
+  if (isRecurringType(row.recurrence_type)) {
+    if (row.recurrence_type === 'weekly') {
+      row.recurrence_day_of_week = dayIndex;
+      row.recurrence_days_mask = 1 << dayIndex;
+      row.recurrence_start_minutes = startMinutes;
+      row.duration_minutes = dur;
+    } else if (row.recurrence_type === 'daily') {
+      row.recurrence_start_minutes = startMinutes;
+      row.duration_minutes = dur;
+    } else if (row.recurrence_type === 'weekly_days') {
+      const sourceDay = parseOccurrenceDayIndex(id) ?? dayIndex;
+      let mask = row.recurrence_days_mask ?? 0;
+      if (dayIndex !== sourceDay) {
+        mask = (mask & ~(1 << sourceDay)) | (1 << dayIndex);
+      }
+      row.recurrence_days_mask = mask;
+      row.recurrence_start_minutes = startMinutes;
+      row.duration_minutes = dur;
+    }
   } else {
     row.start_time = start.toISOString();
     row.end_time = end.toISOString();
@@ -354,9 +379,10 @@ export function moveEvent(id, { weekStart, dayIndex, slotIndex, durationMinutes 
 
   saveData(data);
   const updated = rowToEvent(row);
+  const occurrenceId = isRecurringType(row.recurrence_type) ? `${parentId}-w${dayIndex}` : parentId;
   return Promise.resolve({
     event: updated,
-    occurrence: expandEventsForWeek([row], ws).find((o) => o.parentId === parentId),
+    occurrence: expandEventsForWeek([row], ws).find((o) => o.id === occurrenceId),
   });
 }
 

@@ -38,6 +38,7 @@ import {
   eventAtSlot,
 } from './utils/dates';
 import { slotAtPoint, resolveDropSlot } from './utils/gridDrop';
+import { isRecurringType } from './utils/recurrence';
 
 export default function App() {
   const [weekStart, setWeekStart] = useState(() => getWeekStart());
@@ -142,7 +143,7 @@ export default function App() {
         startTime: optimistic.startTime,
         endTime: optimistic.endTime,
       });
-      if (result?.occurrence) {
+      if (result?.occurrence && !isRecurringType(event.recurrenceType)) {
         setEvents((prev) =>
           prev.map((ev) => (ev.id === event.id ? result.occurrence : ev))
         );
@@ -190,7 +191,7 @@ export default function App() {
     }
     setPreviewEvents(null);
     try {
-      if (event.recurrenceType === 'weekly') {
+      if (isRecurringType(event.recurrenceType)) {
         await updateEvent(parseParentId(event.id), { durationMinutes });
       } else {
         const end = new Date(new Date(event.startTime).getTime() + durationMinutes * 60 * 1000);

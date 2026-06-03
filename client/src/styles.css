@@ -328,6 +328,34 @@ select {
   accent-color: var(--accent);
 }
 
+.day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.day-picker__btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.day-picker__btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.day-picker__btn:hover:not(.day-picker__btn--active) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 .calendar__scroll {
   flex: 1;
   overflow: auto;

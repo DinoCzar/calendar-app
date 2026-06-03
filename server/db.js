@@ -37,6 +37,16 @@ db.exec(`
   );
 `);
 
+const eventColumns = db.prepare('PRAGMA table_info(calendar_events)').all();
+if (!eventColumns.some((col) => col.name === 'recurrence_days_mask')) {
+  db.exec('ALTER TABLE calendar_events ADD COLUMN recurrence_days_mask INTEGER');
+  db.prepare(`
+    UPDATE calendar_events
+    SET recurrence_days_mask = (1 << recurrence_day_of_week)
+    WHERE recurrence_type = 'weekly' AND recurrence_day_of_week IS NOT NULL
+  `).run();
+}
+
 const smartCount = db.prepare('SELECT COUNT(*) AS c FROM smart_tasks').get().c;
 if (smartCount === 0) {
   const insert = db.prepare(
