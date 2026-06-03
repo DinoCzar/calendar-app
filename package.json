@@ -10,7 +10,6 @@
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
     "start": "NODE_ENV=production node server/index.js",
-    "postinstall": "npm install --prefix server",
     "start:server": "npm start --prefix server",
     "start:client": "npm run dev --prefix client"
   },
