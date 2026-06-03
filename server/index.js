@@ -253,13 +253,16 @@ app.post('/api/events/:id/move', (req, res) => {
   const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(parentId);
   if (!row) return res.status(404).json({ error: 'Not found' });
 
-  const { weekStart, dayIndex, slotIndex, durationMinutes, tzOffset } = req.body;
+  const { weekStart, dayIndex, slotIndex, durationMinutes, tzOffset, startTime: clientStart, endTime: clientEnd } =
+    req.body;
   const tzOffsetMin = parseTzOffset(tzOffset);
   const weekStartDateStr = resolveWeekStartDateStr(weekStart, tzOffsetMin);
   const startMinutes = 7 * 60 + slotIndex * 30;
   const dur = durationMinutes ?? row.duration_minutes;
-  const startTime = minutesToISO(weekStartDateStr, dayIndex, startMinutes, tzOffsetMin);
-  const endTime = new Date(new Date(startTime).getTime() + dur * 60 * 1000).toISOString();
+  const computedStart = minutesToISO(weekStartDateStr, dayIndex, startMinutes, tzOffsetMin);
+  const computedEnd = new Date(new Date(computedStart).getTime() + dur * 60 * 1000).toISOString();
+  const startTime = clientStart || computedStart;
+  const endTime = clientEnd || computedEnd;
 
   if (row.recurrence_type === 'weekly') {
     db.prepare(`

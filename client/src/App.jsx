@@ -134,6 +134,8 @@ export default function App() {
         dayIndex: slot.dayIndex,
         slotIndex: slot.slotIndex,
         durationMinutes: event.durationMinutes,
+        startTime: optimistic.startTime,
+        endTime: optimistic.endTime,
       });
       await loadWeek(weekStart);
     } catch (err) {
