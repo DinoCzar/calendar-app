@@ -12,6 +12,7 @@ import {
   getDayIndexInWeek,
   isSameDay,
 } from '../utils/dates';
+import { formatRecurrenceLabel, isRecurringType } from '../utils/recurrence';
 
 const DRAG_THRESHOLD = 8;
 
@@ -129,7 +130,7 @@ function EventBlock({
 
   return (
     <div
-      className={`cal-event${isDraggingThis ? ' cal-event--dragging' : ''}${event.recurrenceType === 'weekly' ? ' cal-event--recurring' : ''}`}
+      className={`cal-event${isDraggingThis ? ' cal-event--dragging' : ''}${isRecurringType(event.recurrenceType) ? ' cal-event--recurring' : ''}`}
       style={style}
       onPointerDown={handleDragPointerDown}
     >
@@ -143,7 +144,7 @@ function EventBlock({
           />
           <span className="cal-event__time">
             {start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-            {event.recurrenceType === 'weekly' ? ' · Weekly' : ''}
+            {formatRecurrenceLabel(event.recurrenceType, event.recurrenceDaysMask)}
           </span>
         </div>
         <div className="cal-event__resize" onPointerDown={handleResizeStart} />

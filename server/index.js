@@ -6,8 +6,10 @@ const db = require('./db');
 const {
   expandEventsForWeek,
   parseOccurrenceId,
+  parseOccurrenceDayIndex,
   resolveWeekStartDateStr,
   minutesToISO,
+  isRecurringType,
   DAY_START_HOUR,
   SLOT_MINUTES,
 } = require('./recurrence');
@@ -53,6 +55,7 @@ function rowToEvent(row) {
     endTime: row.end_time,
     recurrenceType: row.recurrence_type,
     recurrenceDayOfWeek: row.recurrence_day_of_week,
+    recurrenceDaysMask: row.recurrence_days_mask,
     recurrenceStartMinutes: row.recurrence_start_minutes,
     durationMinutes: row.duration_minutes,
     fromSmartTaskId: row.from_smart_task_id,
@@ -161,18 +164,29 @@ app.post('/api/events', (req, res) => {
     durationMinutes = 60,
     recurrenceType = 'none',
     recurrenceDayOfWeek,
+    recurrenceDaysMask,
     recurrenceStartMinutes,
   } = req.body;
 
   const id = randomUUID();
 
-  if (recurrenceType === 'weekly') {
+  if (isRecurringType(recurrenceType)) {
     db.prepare(`
       INSERT INTO calendar_events (
         id, title, description, color, recurrence_type,
-        recurrence_day_of_week, recurrence_start_minutes, duration_minutes
-      ) VALUES (?, ?, ?, ?, 'weekly', ?, ?, ?)
-    `).run(id, title, description, color, recurrenceDayOfWeek, recurrenceStartMinutes, durationMinutes);
+        recurrence_day_of_week, recurrence_days_mask, recurrence_start_minutes, duration_minutes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      title,
+      description,
+      color,
+      recurrenceType,
+      recurrenceType === 'weekly' ? recurrenceDayOfWeek : null,
+      recurrenceType === 'weekly_days' ? recurrenceDaysMask : recurrenceType === 'weekly' ? (1 << recurrenceDayOfWeek) : null,
+      recurrenceStartMinutes,
+      durationMinutes
+    );
   } else {
     db.prepare(`
       INSERT INTO calendar_events (
@@ -207,7 +221,7 @@ app.patch('/api/events/:id', (req, res) => {
   if (description !== undefined) updated.description = description;
   if (color !== undefined) updated.color = color;
 
-  if (updated.recurrence_type === 'weekly') {
+  if (isRecurringType(updated.recurrence_type)) {
     if (recurrenceDayOfWeek !== undefined) updated.recurrence_day_of_week = recurrenceDayOfWeek;
     if (recurrenceStartMinutes !== undefined) {
       updated.recurrence_start_minutes = recurrenceStartMinutes;
@@ -266,12 +280,28 @@ app.post('/api/events/:id/move', (req, res) => {
   const startTime = clientStart || computedStart;
   const endTime = clientEnd || computedEnd;
 
-  if (row.recurrence_type === 'weekly') {
-    db.prepare(`
-      UPDATE calendar_events SET
-        recurrence_day_of_week = ?, recurrence_start_minutes = ?, duration_minutes = ?
-      WHERE id = ?
-    `).run(dayIndex, startMinutes, dur, parentId);
+  if (isRecurringType(row.recurrence_type)) {
+    if (row.recurrence_type === 'weekly') {
+      db.prepare(`
+        UPDATE calendar_events SET
+          recurrence_day_of_week = ?, recurrence_days_mask = ?, recurrence_start_minutes = ?, duration_minutes = ?
+        WHERE id = ?
+      `).run(dayIndex, 1 << dayIndex, startMinutes, dur, parentId);
+    } else if (row.recurrence_type === 'daily') {
+      db.prepare(`
+        UPDATE calendar_events SET recurrence_start_minutes = ?, duration_minutes = ? WHERE id = ?
+      `).run(startMinutes, dur, parentId);
+    } else if (row.recurrence_type === 'weekly_days') {
+      const sourceDay = parseOccurrenceDayIndex(req.params.id) ?? dayIndex;
+      let mask = row.recurrence_days_mask ?? 0;
+      if (dayIndex !== sourceDay) {
+        mask = (mask & ~(1 << sourceDay)) | (1 << dayIndex);
+      }
+      db.prepare(`
+        UPDATE calendar_events SET recurrence_days_mask = ?, recurrence_start_minutes = ?, duration_minutes = ?
+        WHERE id = ?
+      `).run(mask, startMinutes, dur, parentId);
+    }
   } else {
     db.prepare(`
       UPDATE calendar_events SET start_time = ?, end_time = ?, duration_minutes = ? WHERE id = ?
@@ -279,9 +309,10 @@ app.post('/api/events/:id/move', (req, res) => {
   }
 
   const updated = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(parentId);
+  const occurrenceId = isRecurringType(updated.recurrence_type) ? `${parentId}-w${dayIndex}` : parentId;
   res.json({
     event: rowToEvent(updated),
-    occurrence: expandEventsForWeek([updated], weekStartDateStr, tzOffsetMin).find((o) => o.parentId === parentId),
+    occurrence: expandEventsForWeek([updated], weekStartDateStr, tzOffsetMin).find((o) => o.id === occurrenceId),
   });
 });
 
