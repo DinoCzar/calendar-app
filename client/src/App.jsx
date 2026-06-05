@@ -21,6 +21,7 @@ import {
   reorderSmartTasks,
   scheduleSmartTasks,
   recallSmartTasks,
+  ensureServerStateRestored,
   createEvent,
   moveEvent,
   updateEvent,
@@ -76,7 +77,8 @@ export default function App() {
   }, [weekStart, loadWeek, loadSmartTasks]);
 
   useEffect(() => {
-    refresh()
+    ensureServerStateRestored()
+      .then(() => refresh())
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
