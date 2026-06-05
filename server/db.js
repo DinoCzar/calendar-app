@@ -6,6 +6,7 @@ const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'calendar.db');
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = new Database(dbPath);
+console.log(`SQLite database: ${dbPath}`);
 
 db.pragma('journal_mode = WAL');
 

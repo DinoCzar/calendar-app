@@ -63,7 +63,78 @@ function rowToEvent(row) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, now: new Date().toISOString(), commit: process.env.RENDER_GIT_COMMIT || null });
+  res.json({
+    ok: true,
+    now: new Date().toISOString(),
+    commit: process.env.RENDER_GIT_COMMIT || null,
+    databasePath: process.env.DATABASE_PATH || null,
+  });
+});
+
+app.get('/api/state', (_req, res) => {
+  res.json({
+    events: db.prepare('SELECT * FROM calendar_events').all(),
+    smartTasks: db.prepare('SELECT * FROM smart_tasks ORDER BY priority ASC').all(),
+  });
+});
+
+app.post('/api/state', (req, res) => {
+  const { events, smartTasks } = req.body;
+  if (!Array.isArray(events) || !Array.isArray(smartTasks)) {
+    return res.status(400).json({ error: 'events and smartTasks arrays required' });
+  }
+
+  const insertEvent = db.prepare(`
+    INSERT INTO calendar_events (
+      id, title, description, color, start_time, end_time, recurrence_type,
+      recurrence_day_of_week, recurrence_start_minutes, recurrence_days_mask,
+      duration_minutes, from_smart_task_id, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertTask = db.prepare(`
+    INSERT INTO smart_tasks (
+      id, title, description, duration_minutes, priority, status, scheduled_event_id, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM calendar_events').run();
+    db.prepare('DELETE FROM smart_tasks').run();
+
+    for (const row of events) {
+      insertEvent.run(
+        row.id,
+        row.title,
+        row.description ?? '',
+        row.color ?? '#007AFF',
+        row.start_time ?? null,
+        row.end_time ?? null,
+        row.recurrence_type ?? 'none',
+        row.recurrence_day_of_week ?? null,
+        row.recurrence_start_minutes ?? null,
+        row.recurrence_days_mask ?? null,
+        row.duration_minutes,
+        row.from_smart_task_id ?? null,
+        row.created_at ?? null
+      );
+    }
+
+    for (const row of smartTasks) {
+      insertTask.run(
+        row.id,
+        row.title,
+        row.description ?? '',
+        row.duration_minutes,
+        row.priority,
+        row.status ?? 'pending',
+        row.scheduled_event_id ?? null,
+        row.created_at ?? null
+      );
+    }
+  });
+
+  tx();
+  res.json({ ok: true });
 });
 
 app.get('/api/week', (req, res) => {
